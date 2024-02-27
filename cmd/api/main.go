@@ -13,9 +13,8 @@ import (
 
 	"github.com/gofor-little/env"
 	_ "github.com/lib/pq"
+	"greenlight.vysotsky.com/internal/data"
 )
-
-//p. 104
 
 const version = "1.0.0"
 
@@ -33,6 +32,7 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	models data.Models
 }
 
 
@@ -71,6 +71,7 @@ func main() {
 	app := &application{
 		config: conf,
 		logger: logger,
+		models: data.NewModels(db),
 	}
 
 	router := app.routes()

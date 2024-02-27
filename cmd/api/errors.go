@@ -18,7 +18,8 @@ func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, st
 	}
 }
 
-func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request) {
+func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
+	app.logError(r, err)
 	message := "server could not process your request"
 	app.errorResponse(w, r, http.StatusInternalServerError, message)
 }
