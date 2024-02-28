@@ -78,8 +78,8 @@ func main() {
 	handler := app.addLoggging(router)
 
 	server := &http.Server {
-		// Addr: fmt.Sprintf(":%d", conf.port),
-		Addr: fmt.Sprintf("localhost:%d", conf.port),
+		Addr: fmt.Sprintf(":%d", conf.port),
+		// Addr: fmt.Sprintf("localhost:%d", conf.port),
 		Handler: handler,
 		IdleTimeout: time.Minute,
 		ReadTimeout: 10 * time.Second,
