@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -50,7 +51,11 @@ func (dao MovieDAO) GET(id int64) (*Movie, error) {
 	WHERE id=$1`
 
 	movie := Movie{}
-	err := dao.DB.QueryRow(query, id).Scan(
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	err := dao.DB.QueryRowContext(ctx, query, id).Scan(
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
@@ -78,7 +83,10 @@ func (dao MovieDAO) Insert(movie *Movie) error {
 
 	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
-	return dao.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	return dao.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (dao MovieDAO) Update(movie *Movie) error {
@@ -96,7 +104,10 @@ func (dao MovieDAO) Update(movie *Movie) error {
 		movie.Version, // version to avoid data race
 	}
 	
-	err := dao.DB.QueryRow(query, args...).Scan(&movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	err := dao.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -118,7 +129,10 @@ func (dao MovieDAO) Delete(id int64) error {
 		DELETE FROM movies
 		WHERE id=$1`
 	
-	result, err := dao.DB.Exec(query, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	result, err := dao.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
