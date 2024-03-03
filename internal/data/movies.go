@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -40,6 +41,58 @@ type MovieDAO struct {
 	DB *sql.DB
 }
 
+func (dao MovieDAO) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	query := `
+	SELECT count(*) OVER(), id, created_at, title, year, runtime, genres, version 
+	FROM movies
+	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
+	AND (genres @> $2 OR $2 = '{}')
+	ORDER BY %s %s, id ASC
+	LIMIT $3 OFFSET $4`
+
+	query = fmt.Sprintf(query, filters.sortColumn(), filters.sortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	args := []interface{}{title, pq.Array(genres), filters.limit(), filters.offset()}
+
+	rows, err := dao.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+	defer rows.Close()
+
+	movies := []*Movie{}
+	var totalRecords int
+	for rows.Next() {
+		var movie Movie
+		err := rows.Scan(
+			&totalRecords,
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+		)
+		if err != nil {
+			return nil, Metadata{}, err
+		}
+		movies = append(movies, &movie)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, Metadata{}, err
+	}
+
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return movies, metadata, nil
+
+}
+
 func (dao MovieDAO) GET(id int64) (*Movie, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
@@ -52,7 +105,7 @@ func (dao MovieDAO) GET(id int64) (*Movie, error) {
 
 	movie := Movie{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	err := dao.DB.QueryRowContext(ctx, query, id).Scan(
@@ -83,7 +136,7 @@ func (dao MovieDAO) Insert(movie *Movie) error {
 
 	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return dao.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
@@ -103,8 +156,8 @@ func (dao MovieDAO) Update(movie *Movie) error {
 		movie.ID,
 		movie.Version, // version to avoid data race
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	err := dao.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
@@ -128,8 +181,8 @@ func (dao MovieDAO) Delete(id int64) error {
 	query := `
 		DELETE FROM movies
 		WHERE id=$1`
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	result, err := dao.DB.ExecContext(ctx, query, id)

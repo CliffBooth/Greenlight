@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
+	"greenlight.vysotsky.com/internal/validator"
 )
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
@@ -91,3 +93,34 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dist in
 
 	return nil
 }
+
+func (app *application) readString(params url.Values, key string, defaultValue string) string {
+	s := params.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	return s
+}
+
+//read comma separated values from query and return as []string
+func (app *application) readCSV(params url.Values, key string, defaultValue []string) []string {
+	csv := params.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+	return strings.Split(csv, ",")
+}
+
+func (app *application) readInt(params url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := params.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key, "must be and integer value")
+		return defaultValue
+	}
+	return i
+}
+

@@ -9,12 +9,57 @@ import (
 	"greenlight.vysotsky.com/internal/validator"
 )
 
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Title   string
+		Genres  []string
+		Filters data.Filters
+	}
+	v := validator.New()
+	params := r.URL.Query()
+	fmt.Println(params)
+	input.Title = app.readString(params, "title", "")
+	input.Genres = app.readCSV(params, "genres", []string{})
+	input.Filters.Page = app.readInt(params, "page", 1, v)
+	input.Filters.PageSize = app.readInt(params, "page_size", 20, v)
+	input.Filters.Sort = app.readString(params, "sort", "id")
+	input.Filters.SortSafeList = []string{
+		"id",
+		"-id",
+		"title",
+		"-title",
+		"year",
+		"-year",
+		"runtime",
+		"-runtime",
+	}
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+	movies, metadata, err := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	err = app.writeJSON(w, http.StatusOK, envelope{"metadata": metadata, "movies": movies}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
+
+	url := r.URL
+	values := url.Query()
+	fmt.Println("url:", url)
+	fmt.Println("values:", values)
 
 	movie, err := app.models.Movies.GET(id)
 	if err != nil {
