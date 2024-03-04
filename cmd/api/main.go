@@ -76,12 +76,13 @@ func main() {
 	}
 
 	router := app.routes()
-	// handler := app.addLoggging(router)
+	handler := app.recoverPanic(router)
+	handler = app.logRequests(handler)
 
 	server := &http.Server {
 		// Addr: fmt.Sprintf(":%d", conf.port),
 		Addr: fmt.Sprintf("localhost:%d", conf.port),
-		Handler: router,
+		Handler: handler,
 		ErrorLog: log.New(logger, "", 0),
 		IdleTimeout: time.Minute,
 		ReadTimeout: 10 * time.Second,
