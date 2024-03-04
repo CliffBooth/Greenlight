@@ -28,6 +28,11 @@ type config struct {
 		maxIdleConns int
 		maxIdleTime string
 	}
+	limiter struct {
+		rps float64
+		burst int
+		enabled bool
+	}
 }
 
 type application struct {
@@ -51,6 +56,11 @@ func main() {
 	flag.IntVar(&conf.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&conf.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&conf.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max idle time (10s|30m)")
+
+	flag.Float64Var(&conf.limiter.rps, "limiter-rps", 2, "Rate limiter maximium requests per second")
+	flag.IntVar(&conf.limiter.burst, "limiter-burst", 4, "Rate limiter maximium burst")
+	flag.BoolVar(&conf.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+
 	flag.Parse()
 
 	if len(conf.db.dsn) == 0 {
@@ -77,11 +87,12 @@ func main() {
 
 	router := app.routes()
 	handler := app.recoverPanic(router)
+	handler = app.rateLimit(handler)
 	handler = app.logRequests(handler)
 
 	server := &http.Server {
-		// Addr: fmt.Sprintf(":%d", conf.port),
-		Addr: fmt.Sprintf("localhost:%d", conf.port),
+		Addr: fmt.Sprintf(":%d", conf.port),
+		// Addr: fmt.Sprintf("localhost:%d", conf.port),
 		Handler: handler,
 		ErrorLog: log.New(logger, "", 0),
 		IdleTimeout: time.Minute,
