@@ -14,6 +14,7 @@ import (
 	"github.com/gofor-little/env"
 	_ "github.com/lib/pq"
 	"greenlight.vysotsky.com/internal/data"
+	"greenlight.vysotsky.com/internal/jsonlog"
 )
 
 const version = "1.0.0"
@@ -31,7 +32,7 @@ type config struct {
 
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -57,16 +58,16 @@ func main() {
 	}
 
 	fmt.Println("port:", conf.port)
-	logger := log.New(os.Stdout, "", log.Ldate | log.Ltime)
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	db, err := openDB(conf)
 	if err != nil {
-		logger.Fatal(err)
+		logger.PrintFatal(err, nil)
 	}
 
 	defer db.Close()
 
-	logger.Printf("database connection established")
+	logger.PrintInfo("database connection established", nil)
 
 	app := &application{
 		config: conf,
@@ -75,19 +76,23 @@ func main() {
 	}
 
 	router := app.routes()
-	handler := app.addLoggging(router)
+	// handler := app.addLoggging(router)
 
 	server := &http.Server {
 		// Addr: fmt.Sprintf(":%d", conf.port),
 		Addr: fmt.Sprintf("localhost:%d", conf.port),
-		Handler: handler,
+		Handler: router,
+		ErrorLog: log.New(logger, "", 0),
 		IdleTimeout: time.Minute,
 		ReadTimeout: 10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-	logger.Printf("starting %s server on %s", conf.env, server.Addr)
+	logger.PrintInfo("starting server", map[string]string {
+		"addr": server.Addr,
+		"env": conf.env,
+	})
 	err = server.ListenAndServe()
-	logger.Fatal(err)
+	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {

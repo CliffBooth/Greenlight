@@ -1,8 +1,8 @@
 package main
 
-import (
-	"net/http"
-)
+// import (
+// 	"net/http"
+// )
 
 type LoggingInfo struct {
 	ipaddr string
@@ -11,15 +11,15 @@ type LoggingInfo struct {
 	code int
 }
 
-func (app *application) addLoggging(h http.Handler) http.Handler {
-	fn := func (w http.ResponseWriter, r *http.Request) {
-		info := &LoggingInfo {
-			method: r.Method,
-			uri: r.URL.String(),
-			ipaddr: r.RemoteAddr,
-			}	
-			app.logger.Printf("%s \"%s %s\"\n", info.ipaddr, info.method, info.uri)
-			h.ServeHTTP(w, r)
-	}
-	return http.HandlerFunc(fn)
-}
+// func (app *application) addLoggging(h http.Handler) http.Handler {
+// 	fn := func (w http.ResponseWriter, r *http.Request) {
+// 		info := &LoggingInfo {
+// 			method: r.Method,
+// 			uri: r.URL.String(),
+// 			ipaddr: r.RemoteAddr,
+// 			}	
+// 			app.logger.Printf("%s \"%s %s\"\n", info.ipaddr, info.method, info.uri)
+// 			h.ServeHTTP(w, r)
+// 	}
+// 	return http.HandlerFunc(fn)
+// }
