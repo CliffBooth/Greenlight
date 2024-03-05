@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -21,16 +18,16 @@ const version = "1.0.0"
 
 type config struct {
 	port int
-	env string
-	db struct {
-		dsn string
+	env  string
+	db   struct {
+		dsn          string
 		maxOpenConns int
 		maxIdleConns int
-		maxIdleTime string
+		maxIdleTime  string
 	}
 	limiter struct {
-		rps float64
-		burst int
+		rps     float64
+		burst   int
 		enabled bool
 	}
 }
@@ -40,7 +37,6 @@ type application struct {
 	logger *jsonlog.Logger
 	models data.Models
 }
-
 
 func main() {
 	var conf config
@@ -85,26 +81,11 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	router := app.routes()
-	handler := app.recoverPanic(router)
-	handler = app.rateLimit(handler)
-	handler = app.logRequests(handler)
+	err = app.serve()
 
-	server := &http.Server {
-		Addr: fmt.Sprintf(":%d", conf.port),
-		// Addr: fmt.Sprintf("localhost:%d", conf.port),
-		Handler: handler,
-		ErrorLog: log.New(logger, "", 0),
-		IdleTimeout: time.Minute,
-		ReadTimeout: 10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
-	logger.PrintInfo("starting server", map[string]string {
-		"addr": server.Addr,
-		"env": conf.env,
-	})
-	err = server.ListenAndServe()
-	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {
@@ -116,14 +97,14 @@ func openDB(cfg config) (*sql.DB, error) {
 	db.SetMaxOpenConns(cfg.db.maxOpenConns)
 	db.SetMaxIdleConns(cfg.db.maxIdleConns)
 
-	duration, err := time.ParseDuration(cfg.db.maxIdleTime) 
+	duration, err := time.ParseDuration(cfg.db.maxIdleTime)
 	if err != nil {
 		return nil, err
 	}
 
 	db.SetConnMaxIdleTime(duration)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	err = db.PingContext(ctx)
@@ -132,21 +113,4 @@ func openDB(cfg config) (*sql.DB, error) {
 	}
 
 	return db, nil
-}
-
-func getLogger() *log.Logger {
-	file, err := os.OpenFile("log.txt", os.O_RDWR | os.O_APPEND | os.O_CREATE, 0666) 
-	if err != nil {
-		fmt.Println("error crating logger file!")
-		file = os.Stdout
-	}
-	writer := bufio.NewWriter(file)
-	i, err := fmt.Fprintln(writer, "hello bichezz")
-	defer writer.Flush()
-	defer file.Close()
-	fmt.Println("i = ", i)
-	fmt.Println("err1 = ", err)
-	logger := log.New(writer, "", log.Ldate | log.Ltime)
-	logger.SetOutput(writer)
-	return logger
 }
